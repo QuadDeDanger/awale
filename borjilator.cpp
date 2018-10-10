@@ -21,9 +21,7 @@
 #include <iterator>
 #include <thread>
 #include <shared_mutex>
-#include <cstdlib>
 #include <string.h>
-#include <string>
 #include <sstream>
 #include <time.h>
 #include <getopt.h>
@@ -703,11 +701,11 @@ int main(int argc, char**argv) {
 					fitxes_fi += t.taulell[i][RIVAL];
 				}
 				t.punts[RIVAL] += fitxes_fi; 
-				std::cout << "Punts: MYSELF=" << t.punts[MYSELF] << " RIVAL=" << t.punts[RIVAL] << std::endl;
+				std::cout << "Score: MYSELF=" << t.punts[MYSELF] << " RIVAL=" << t.punts[RIVAL] << std::endl;
 				return 0;
 			}
 
-			std::cout << "Mou desde ";
+			std::cout << "Move from ";
 			std::cout << spec[pos-1]->getMove()+1 << std::endl;
 #if PRINT_MODE == MACHINE
 			char buf[16];
