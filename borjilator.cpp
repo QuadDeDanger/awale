@@ -1,14 +1,16 @@
 // Identifiers for self and rival
-#define ELL 0
-#define JO 1
+#define RIVAL 0
+#define MYSELF 1
 
 // Print mode, stdio for human vs IA, piped for IA vs IA
 #define HUMAN 0
 #define MACHINE 1
 
-#define BOARD_MODE ELL 
+#define BOARD_MODE RIVAL 
 #define PRINT_MODE HUMAN
 //#define PRINT_MODE MACHINE
+
+#define MEMOIZE_ENABLED
 
 #include <climits>
 #include <stdint.h>
@@ -21,6 +23,8 @@
 #include <shared_mutex>
 #include <cstdlib>
 #include <string.h>
+#include <string>
+#include <sstream>
 #include <time.h>
 #include <getopt.h>
 
@@ -35,17 +39,15 @@
 int RECURSION_LEVEL = 13;
 int MATADES_MULT = 300;
 int MORTES_MULT = 400;
-// MIN_RECURSION: numero minim de recursions restants per permetre matar el thread
-#define MIN_RECURSION 10
+// MIN_RECURSION: minimum number of recursions before we allow killing the thread
+#define MIN_RECURSION 9
 #define MAX_RECURSION 19
 // TIME_BUDGET_HINT: time limit before we start to finish the process. In ms
-#define TIME_BUDGET_HINT 60000
+#define TIME_BUDGET_HINT 1000
 #define TIME_BUDGET_MIN TIME_BUDGET_HINT 
 #define TIME_BUDGET_MAX (TIME_BUDGET_MIN*1.5)
 
-//#define MEMOIZE_MAX_SIZE 250000
 #define MEMOIZE_MAX_SIZE 50000000
-//#define MEMOIZE_MAX_SIZE 20000000
 
 #define _12AWARD 1
 #define _12PENALTY 1
@@ -61,6 +63,8 @@ int MORTES_MULT = 400;
 #define MAX(a,b) (a>b?a:b)
 
 static short g_terminate = 0;
+static bool g_clock_ticking = true;
+static clock_t g_start_time = 0;
 static int jugada = 1;
 
 #ifdef DEBUG
@@ -99,49 +103,55 @@ bool operator!=(IDj &a, IDj &b){
 std::istream& operator>>(std::istream &in, IDj &a) {
 	in.read((char*)a.t.c, 6*sizeof(uint8_t));
 	in.read((char*)&a.t.c[8], 6*sizeof(uint8_t));
-	//std::cout << "C=" << (int)a.t.c[0] << " " << (int)a.t.c[1] <<  (int)a.t.c[2] << " " <<  (int)a.t.c[3] << " " <<  (int)a.t.c[4] << " " << (int)a.t.c[5] << " " << std::endl;
-	//std::cout << "C=" << (int)a.t.c[8] << " " << (int)a.t.c[9] <<  (int)a.t.c[10] << " " <<  (int)a.t.c[11] << " " <<  (int)a.t.c[12] << " " << (int)a.t.c[13] << " " << std::endl;
 	return in;
 }
 std::ostream& operator<<(std::ostream &out, IDj &a) {
 	out.write((char*)a.t.c, 6*sizeof(uint8_t));
 	out.write((char*)&a.t.c[8], 6*sizeof(uint8_t));
-	//std::cout << "C=" << (int)a.t.c[0] << " " << (int)a.t.c[1] <<  (int)a.t.c[2] << " " <<  (int)a.t.c[3] << " " <<  (int)a.t.c[4] << " " << (int)a.t.c[5] << " " << std::endl;
-	//std::cout << "C=" << (int)a.t.c[8] << " " << (int)a.t.c[9] <<  (int)a.t.c[10] << " " <<  (int)a.t.c[11] << " " <<  (int)a.t.c[12] << " " << (int)a.t.c[13] << " " << std::endl;
 	return out;
 }
 /*std::ostream& operator<<(std::ostream &out, const IDj &a) {
 	//out.write((char*)a.t.c, 6*sizeof(uint8_t));
 	//out.write((char*)&a.t.c[8], 6*sizeof(uint8_t));
-	out << "C=" << (int)a.t.c[0] << " " << (int)a.t.c[1] <<  (int)a.t.c[2] << " " <<  (int)a.t.c[3] << " " <<  (int)a.t.c[4] << " " << (int)a.t.c[5] << " " << std::endl;
-	out << "C=" << (int)a.t.c[8] << " " << (int)a.t.c[9] <<  (int)a.t.c[10] << " " <<  (int)a.t.c[11] << " " <<  (int)a.t.c[12] << " " << (int)a.t.c[13] << " " << std::endl;
+	out << std::endl;
+	out << "C=" << (int)a.t.c[0] << " " << (int)a.t.c[1] << " " << (int)a.t.c[2] << " " <<  (int)a.t.c[3] << " " <<  (int)a.t.c[4] << " " << (int)a.t.c[5] << " " << std::endl;
+	out << "C=" << (int)a.t.c[8] << " " << (int)a.t.c[9] << " " << (int)a.t.c[10] << " " <<  (int)a.t.c[11] << " " <<  (int)a.t.c[12] << " " << (int)a.t.c[13] << " " << std::endl;
 	return out;
 }*/
-std::istream& operator>>(std::istream &in, std::pair<int,short> &vm) {
+std::istream& operator>>(std::istream &in, std::tuple<int,short,unsigned short> &vmr) {
 	char v[4];
+	int vv=0;
 	char m[2];
-	vm.first = 0;
-	vm.second = 0;
+	short mm=0;
+	char r[2];
+	unsigned short rr=0;
 	in.read(v, sizeof(int));
 	in.read(m, sizeof(short));
+	in.read(r, sizeof(unsigned short));
 	for (int i = 0; i < sizeof(int); i++)
-		vm.first = (vm.first<<8) + (unsigned char)v[i];
+		vv = (vv<<8) + (unsigned char)v[i];
 	for (int i = 0; i < sizeof(short); i++)
-		vm.second = (vm.second<<8) + (unsigned char)m[i];
+		mm = (mm<<8) + (unsigned char)m[i];
+	for (int i = 0; i < sizeof(unsigned short); i++)
+		rr = (rr<<8) + (unsigned char)r[i];
 
-//	std::cout << vm.first << " " << vm.second << std::endl;
+	vmr = std::make_tuple(vv, mm, rr);
+
 	return in;
 }
-std::ostream& operator<<(std::ostream &out, std::pair<int,short> &vm) {
-//	std::cout << vm.first << " " << vm.second << std::endl;
+std::ostream& operator<<(std::ostream &out, std::tuple<int,short,unsigned short> &vmr) {
 	char v[4];
 	char m[2];
+	char r[2];
 	for (int i = 0; i < sizeof(int); i++)
-		v[3 - i] = (vm.first >> (i * 8));
+		v[3 - i] = (std::get<0>(vmr) >> (i * 8));
 	for (int i = 0; i < sizeof(short); i++)
-		m[1 - i] = (vm.second >> (i * 8));
+		m[1 - i] = (std::get<1>(vmr) >> (i * 8));
+	for (int i = 0; i < sizeof(unsigned short); i++)
+		r[1 - i] = (std::get<2>(vmr) >> (i * 8));
 	out.write(v, sizeof(int));
 	out.write(m, sizeof(short));
+	out.write(r, sizeof(unsigned short));
 	return out;
 }
 
@@ -172,13 +182,20 @@ class joc {
 		void print();
 		void ini();
 		IDj getId(const signed char jug);
-		std::unordered_map<IDj, std::pair<int, short> > *memoize;
-		clock_t start_time;
+		std::unordered_map<IDj, std::tuple<int, short, unsigned short> > *memoize;
+		~joc();
+		std::string id2str(const IDj &a);
 	private:
 		short moviment;
 		int getValue(const signed char jug);
 };
 
+std::string joc::id2str(const IDj &a) {
+	std::stringstream out;
+	out << "C=" << (int)a.t.c[0] << " " << (int)a.t.c[1] << " " << (int)a.t.c[2] << " " <<  (int)a.t.c[3] << " " <<  (int)a.t.c[4] << " " << (int)a.t.c[5] << " " << std::endl;
+	out << "C=" << (int)a.t.c[8] << " " << (int)a.t.c[9] << " " << (int)a.t.c[10] << " " <<  (int)a.t.c[11] << " " <<  (int)a.t.c[12] << " " << (int)a.t.c[13] << " " << std::endl;
+	return out.str();
+}
 short joc::getMove() {
 	return moviment;
 }
@@ -195,19 +212,19 @@ IDj joc::getId(const signed char jug) {
 }
 
 bool joc::mou(short pos, signed char jug) {
-	if (pos >= 6 || pos < 0) {
-		return false;
-	}
-
+	bool cangive = false;
 	short fitxes = taulell[pos][jug];
-
-	if (fitxes <= 0) {
-		return false;
-	}
-
+	short fitxes_rival = 0;
 	const signed char jug_ini = jug;
 	const short pos_ini = pos;
 
+	if (pos >= 6 || pos < 0 || fitxes <= 0) {
+		return false;
+	}
+
+	for (int i=0; i<6; i++) {
+		cangive = cangive || taulell[i][jug] > i;
+	}
 
 	taulell[pos][jug] = 0;
 	
@@ -235,8 +252,12 @@ bool joc::mou(short pos, signed char jug) {
 		}
 	}
 
+	// Can't starve opponent 
+	for (int i=0; i<6; i++) {
+		fitxes_rival = fitxes_rival + taulell[i][(jug_ini+1)%2];
+	}
 
-	return true;
+	return !(fitxes_rival == 0 && cangive);
 }
 
 int joc::ia(const signed char jug, unsigned short rec, const uint8_t path) {
@@ -245,6 +266,7 @@ int joc::ia(const signed char jug, unsigned short rec, const uint8_t path) {
 	short pos;
 	
 	IDj id = getId(jug);
+#ifdef MEMOIZE_ENABLED
 	assert(memoize);
 	mtx.lock_shared();
 	if (memoize->find(id) != memoize->end()) {
@@ -253,12 +275,15 @@ int joc::ia(const signed char jug, unsigned short rec, const uint8_t path) {
 		used_memoizes++;
 		mtx2.unlock();
 #endif
-		moviment = (*memoize)[id].second;
-		auto retval= (*memoize)[id].first;
-		mtx.unlock_shared();
-		return retval;
+		if (std::get<2>((*memoize)[id]) >= rec) {
+			moviment = std::get<1>((*memoize)[id]);
+			auto retval = std::get<0>((*memoize)[id]);
+			mtx.unlock_shared();
+			return retval;
+		}
 	}
 	mtx.unlock_shared();
+#endif
 
 	valor_actual = getValue(jug);
 	if (rec <= 0) {
@@ -279,9 +304,9 @@ int joc::ia(const signed char jug, unsigned short rec, const uint8_t path) {
 	}
 
 	auto time = clock();
-	if (rec > MIN_RECURSION && (time-start_time)*1000/CLOCKS_PER_SEC > TIME_BUDGET_HINT) {
+	if (g_clock_ticking && rec > MIN_RECURSION && (time-g_start_time)*1000/CLOCKS_PER_SEC > TIME_BUDGET_HINT) {
 		rec--;
-	} else if (rec > 1 && (time-start_time)*1000/CLOCKS_PER_SEC > TIME_BUDGET_MAX) {
+	} else if (g_clock_ticking && rec > 1 && (time-g_start_time)*1000/CLOCKS_PER_SEC > TIME_BUDGET_MAX) {
 		rec--;
 	}
 
@@ -311,18 +336,18 @@ int joc::ia(const signed char jug, unsigned short rec, const uint8_t path) {
 		for(int i=RECURSION_LEVEL-rec; i>0; i--) {
 			std::cout << " ";
 		}
-		if (jug == JO)
-			std::cout << "JO  ";
+		if (jug == MYSELF)
+			std::cout << "MYSELF  ";
 		else
-			std::cout << "ELL ";
+			std::cout << "RIVAL ";
 		std::cout << value << std::endl;
 	}
 	
 	/*if (rec >= RECURSION_LEVEL-1) {
-		if (jug == JO)
-			std::cout << "JO  ";
+		if (jug == MYSELF)
+			std::cout << "MYSELF  ";
 		else
-			std::cout << "ELL ";
+			std::cout << "RIVAL ";
 		std::cout << "(" << moviment+1 <<") " << value << std::endl;
 	}*/
 #endif
@@ -342,19 +367,21 @@ int joc::ia(const signed char jug, unsigned short rec, const uint8_t path) {
 		else if (taulell[5][jug] > 0)
 			moviment = 5;
 		else
-//			value=INT_MAX/4; // Victoria perque no podem fer moviments? Depen de si l'altre estava obligat o no a donar-nos fitxes
 			value=0; // Victoria perque no podem fer moviments? Depen de si l'altre estava obligat o no a donar-nos fitxes
 	}
 
+#ifdef MEMOIZE_ENABLED
 	assert(memoize);
 	if (rec >= MIN_RECURSION)  {
 		mtx.lock();
-		if ((memoize->size() < MEMOIZE_MAX_SIZE) && (memoize->find(id) == memoize->end())) {
-			std::pair<int, short> p (value, moviment);
-			(*memoize)[id] = p;
+		if ((memoize->size() < MEMOIZE_MAX_SIZE)) {
+			if ((memoize->find(id) == memoize->end()) || std::get<2>(memoize->find(id)->second) < rec) {
+				(*memoize)[id] = std::make_tuple(value, moviment, rec);
+			}
 		}
 		mtx.unlock();
 	}
+#endif
 
 	return value;
 }
@@ -363,11 +390,12 @@ joc* joc::copy() {
 	joc *r = new joc();
 	memcpy(r->taulell, this->taulell, 12*sizeof(signed char));
 	r->moviment = -1;
-	r->punts[JO] = this->punts[JO];
-	r->punts[ELL] = this->punts[ELL];
+	r->punts[MYSELF] = this->punts[MYSELF];
+	r->punts[RIVAL] = this->punts[RIVAL];
 	r->memoize = this->memoize;
-	r->start_time = this->start_time;
 	return r;
+}
+joc::~joc() {
 }
 
 int joc::getValue(const signed char jug) {
@@ -417,8 +445,6 @@ int joc::getValue(const signed char jug) {
 			if (j == altre && taulell[i][j] > 11+i) {
 				ret -= (taulell[i][j] - 11-i) * ACUM_PENALTY;
 			}
-
-
 		}
 	}
 
@@ -433,12 +459,7 @@ int joc::getValue(const signed char jug) {
 			couldhaveplayed=couldhaveplayed || (taulell[i][jug] > i);
 		}
 		if (couldhaveplayed) {
-			if (punts[JO] < 25) {
-				return (ret+INT_MIN/4 > INT_MIN)? ret+INT_MIN/4: INT_MIN+1;
-			}
-			else {
-				ret -= (48 - punts[jug] - punts[altre]) * MORTES_MULT;
-			}
+			return (ret+INT_MIN/4 > INT_MIN)? ret+INT_MIN/4: INT_MIN+1;
 		}
 		else {
 			ret += num_fitxes_jug * MATADES_MULT;
@@ -463,33 +484,32 @@ int joc::getValue(const signed char jug) {
 	return ret;
 }
 
-
 void joc::print() {
 	int i;
 
-#if BOARD_MODE == JO
+#if BOARD_MODE == MYSELF
 /*	std::cout << "1 2 3 4 5 6" << std::endl;
 	std::cout << "-----------" << std::endl;*/
 	for (i=0; i<6; i++) {
-		std::cout << (signed)taulell[i][ELL] <<" ";
+		std::cout << (signed)taulell[i][RIVAL] <<" ";
 	}
 	std::cout << std::endl;
 	for (i=5; i>=0; i--) {
-		std::cout << (signed)taulell[i][JO] <<" ";
+		std::cout << (signed)taulell[i][MYSELF] <<" ";
 	}
 #else
 	for (i=0; i<6; i++) {
-		std::cout << (signed)taulell[i][JO] <<" ";
+		std::cout << (signed)taulell[i][MYSELF] <<" ";
 	}
 	std::cout << std::endl;
 	for (i=5; i>=0; i--) {
-		std::cout << (signed)taulell[i][ELL] <<" ";
+		std::cout << (signed)taulell[i][RIVAL] <<" ";
 	}
 /*	std::cout << std::endl << "-----------";
 	std::cout << std::endl << "6 5 4 3 2 1";*/
 #endif
 	std::cout << std::endl;
-	std::cout << "Punts: JO=" << punts[JO] << " ELL=" << punts[ELL] << std::endl;
+	std::cout << "Score: MYSELF=" << punts[MYSELF] << " RIVAL=" << punts[RIVAL] << std::endl;
 }
 
 void joc::ini() {
@@ -500,23 +520,22 @@ void joc::ini() {
 			taulell[i][j] = 4;
 		}
 	}
-	punts[JO] = 0;
-	punts[ELL] = 0;
-
-	start_time = clock();
+	punts[MYSELF] = 0;
+	punts[RIVAL] = 0;
 }
 
 
-std::unordered_map<IDj, std::pair<int,short> >* load_memoize(std::string filename) {
-	std::unordered_map<IDj, std::pair<int, short> > *ret = new std::unordered_map<IDj, std::pair<int, short> >;
+std::unordered_map<IDj, std::tuple<int,short,unsigned short> >* load_memoize(std::string filename) {
+	std::unordered_map<IDj, std::tuple<int, short, unsigned short> > *ret = new std::unordered_map<IDj, std::tuple<int, short, unsigned short> >;
 	IDj key;
-	std::pair <int, short> valmov;
+	std::tuple <int, short, unsigned short> valmovret;
 	std::ifstream file;
 	file.open(filename, std::ios::in |std::ios::binary);
 	std::cout << "Loading from " << filename << "..." << std::endl;;
 	while (!file.eof() && !file.fail()) {
-		file >> key >> valmov;
-		(*ret)[key] = valmov;
+		file >> key >> valmovret;
+//		std::cout << "RET SIZE=" << ret->size() << " KEY=" << key<< " VALUE=" << valmov.first << "," << valmov.second << std::endl;
+		(*ret)[key] = valmovret;
 	}
 	std::cout << ret->size() << " values loaded." << std::endl;
 	return ret;
@@ -531,16 +550,17 @@ int main(int argc, char**argv) {
 	clock_t time;
 	short last_eviction=0; // indica quin quart de cache de memoització toca esborrar
 	int c;
+	char *memoize_file = NULL;
 
 	MATADES_MULT = 0;
 	MORTES_MULT = 0;
-	while ((c = getopt (argc, argv, "p:a:d:")) != -1) {
+	while ((c = getopt (argc, argv, "p:a:d:m:")) != -1) {
 		switch(c) {
 			case 'p':
-				if (!strcmp(optarg, "JO"))
-					primer = "JO";
+				if (!strcmp(optarg, "MYSELF"))
+					primer = "MYSELF";
 				else 
-					primer = "ELL";
+					primer = "RIVAL";
 				break;
 			case 'd':
 				MORTES_MULT = atoi(optarg);
@@ -548,8 +568,16 @@ int main(int argc, char**argv) {
 			case 'a':
 				MATADES_MULT = atoi(optarg);
 				break;
-		}
+			case 'm':
+				memoize_file = (char*)malloc(sizeof(optarg));
+				strcpy(memoize_file, optarg);
 
+		}
+	}
+
+	if (!memoize_file) {
+		memoize_file = (char*)malloc(sizeof("memoize.dat"));
+		strcpy(memoize_file, "memoize.dat");
 	}
 	
 	srand(clock());
@@ -564,10 +592,18 @@ int main(int argc, char**argv) {
 #endif
 
 	t.ini();
-	t.memoize = load_memoize("memoize.dat");
+#ifdef MEMOIZE_ENABLED
+	t.memoize = load_memoize(memoize_file);
+#ifdef VERBOSE_DEBUG
+	std::cout << std::endl;
+	for (auto it= t.memoize->begin(); it != t.memoize->end(); it++) {
+		std::cout << t.id2str(it->first) << "\t\t\t\t-> " << std::get<0>(it->second) << "\t" << std::get<1>(it->second) << "\t" << std::get<2>(it->second) << std::endl; 
+	}
+#endif
+#endif
 
 	if (primer == "") {
-		std::cout << "Qui comença? [JO/ELL] ";
+		std::cout << "Qui comença? [MYSELF/RIVAL] ";
 		std::cin >> primer;
 	}
 #if PRINT_MODE == MACHINE
@@ -576,7 +612,7 @@ int main(int argc, char**argv) {
 	const char *fifo2= "/tmp/awale2";
 	mkfifo(fifo1, 0666);
 	mkfifo(fifo2, 0666);
-	if (primer == "JO") {
+	if (primer == "MYSELF") {
 		pipe_r = open(fifo1, O_RDONLY);
 		pipe_w = open(fifo2, O_WRONLY);
 	}
@@ -589,9 +625,10 @@ int main(int argc, char**argv) {
 #endif
 
 
-	if (primer == "JO") {
+	if (primer == "MYSELF") {
+		g_clock_ticking = true;
 		t.print();
-		t.ia(JO, RECURSION_LEVEL);
+		t.ia(MYSELF, RECURSION_LEVEL);
 		std::cout << "Mou desde ";
 		std::cout << t.getMove()+1 << std::endl;
 #if PRINT_MODE == MACHINE
@@ -599,51 +636,53 @@ int main(int argc, char**argv) {
 		snprintf(buf, sizeof(buf), "%d", t.getMove()+1);
 		write(pipe_w, buf, sizeof(buf));
 #endif
-		if (!t.mou(t.getMove(), JO)) {
-			std::cout << "Posició incorrecta: " << (int)pos+1 << std::endl;
+		if (!t.mou(t.getMove(), MYSELF)) {
+			std::cout << "Invalid move: " << (int)pos+1 << std::endl;
 		}
 		jugada++;
 	}
 
 	for(;;) {
 		g_terminate = 0;
+		g_clock_ticking = false;
 #if PRINT_MODE == MACHINE
-		if (t.punts[JO] > 24 || t.punts[ELL] > 24) {
+		if (t.punts[MYSELF] > 24 || t.punts[RIVAL] > 24) {
 			t.print();
 			exit(0);
 		}
 #endif
 
-		// multithread mentre esperem
+		// multithread while waiting for rival 
 		for (int i=0; i<6; i++) {
-			// fem 6 taulells, un per cada moviment possible que pot fer el rival. Per cada un d'ells, obtenim el millor resultat possible per a nosaltres.
+			// Generate 6 games with each possible play by the opponent. Launch threaded execution.
 			spec[i] = t.copy();
-			spec[i]->start_time = clock();
-			if (spec[i]->mou(i, ELL)) {
-				th[i] = new std::thread(&joc::ia, spec[i], JO, RECURSION_LEVEL, i+1);
+			if (spec[i]->mou(i, RIVAL)) {
+				th[i] = new std::thread(&joc::ia, spec[i], MYSELF, RECURSION_LEVEL, i+1);
 			}
 			else {
+				// Illegal move, discard
 				th[i] = NULL;
 			}
 		}
 
-		// Guardem la taula al final de cada torn
+#ifdef MEMOIZE_ENABLED
+		// save to a file
 		std::ofstream myfile;
-		myfile.open("memoize.dat", std::ios::out| std::ios::binary);
+		myfile.open(memoize_file, std::ios::out| std::ios::binary);
 		for (auto it = t.memoize->begin(); it != t.memoize->end(); it++) {
 			IDj key;
-			std::pair<int,short> valmov;
+			std::tuple<int,short,unsigned short> valmovrec;
 			key = it->first;
-			valmov.first = it->second.first;
-			valmov.second = it->second.second;
-			myfile << key << valmov;
+			valmovrec = it->second;
+			myfile << key << valmovrec;
 		}
 		myfile.close();
+#endif
 
 		time = clock();
 
 		t.print();
-		std::cout << "Posició del seu moviment: ";
+		std::cout << "Their move [1-6]: ";
 #if PRINT_MODE == HUMAN
 		std::cin >> pos;
 #endif
@@ -653,71 +692,76 @@ int main(int argc, char**argv) {
 		pos = atoi(buf);
 		std::cout << pos << std::endl;
 #endif
-		bool ok = t.mou(pos-1, ELL);
+		bool ok = t.mou(pos-1, RIVAL);
 		if (ok)  {
 			jugada++;
 			t.print();
-			// Intentem proporcionar el resultat abans de que finalitzin els demés threads
+			// Set every thread except 'pos' thread to be terminated.
 			g_terminate = pos;
+			g_start_time = clock();
+			g_clock_ticking = true;
+			// Join 'pos' thread. Kill the rest later.
 			th[pos-1]->join();
-			t.mou(spec[pos-1]->getMove(), JO);
+			assert(t.mou(spec[pos-1]->getMove(), MYSELF));
+			g_clock_ticking = false;
 
-			//Condició d'acabament
+			// End condition
 			if (spec[pos-1]->getMove() == - 1) {
 				int fitxes_fi = 0;
-				std::cout << std::endl;
-				std::cout << "Sense moviments possibles.";
+				std::cout << std::endl << "No more moves. Game is over." << std::endl;
 				for (int i=0; i<6; i++) {
-					if (t.taulell[i][ELL] > i) {
-						// Victoria
-						std::cout << "VICTORIA per moviment ilegal del rival.";
-						exit(0);
-					}
-					fitxes_fi += t.taulell[i][ELL];
+					fitxes_fi += t.taulell[i][RIVAL];
 				}
-				t.punts[ELL] += fitxes_fi; 
-				std::cout << "Punts: JO=" << t.punts[JO] << " ELL=" << t.punts[ELL] << std::endl;
-				exit(0);
+				t.punts[RIVAL] += fitxes_fi; 
+				std::cout << "Punts: MYSELF=" << t.punts[MYSELF] << " RIVAL=" << t.punts[RIVAL] << std::endl;
+				return 0;
 			}
 
 			std::cout << "Mou desde ";
 			std::cout << spec[pos-1]->getMove()+1 << std::endl;
 #if PRINT_MODE == MACHINE
-		char buf[16];
-		snprintf(buf, sizeof(buf), "%d", spec[pos-1]->getMove()+1);
-		write(pipe_w, buf, sizeof(buf));
+			char buf[16];
+			snprintf(buf, sizeof(buf), "%d", spec[pos-1]->getMove()+1);
+			write(pipe_w, buf, sizeof(buf));
 #endif
 			jugada++;
-			// ... i esperem a la resta de threads per continuar
+			// Wait for the rest of the threads to continue 
 			for (int i=pos%6; i!=pos-1; i=(i+1)%6) {
-				if (th[i])
+				if (th[i]) {
 					th[i]->join();
+				}
 			}
 
-			// Calcul de temps
-			int ms = (clock()-time)*1000/CLOCKS_PER_SEC;
+			// Timekeeping 
+			int ms = (clock()-g_start_time)*1000/CLOCKS_PER_SEC;
 #ifdef DEBUG
-			std::cout << "Calculat en " << ms << " milisegons. " << std:: endl;;
+			std::cout << "Computed in " << (clock()-time)*1000/CLOCKS_PER_SEC << " milliseconds. Total time vs player: " << ms << " milliseconds." << std:: endl;;
+#ifdef MEMOIZE_ENABLED
 			std::cout << "Memoize table size: " << t.memoize->size() << std:: endl;;
+#endif
 #endif
 			if (ms < TIME_BUDGET_MIN) {
 				RECURSION_LEVEL = MIN(RECURSION_LEVEL+1, MAX_RECURSION);
 #ifdef DEBUG
-				std::cout << "Incrementant dificultat (" << RECURSION_LEVEL << ")" << std::endl;
+				std::cout << "Increasing difficulty (" << RECURSION_LEVEL << ")" << std::endl;
 #endif
 			}
 			if (ms > TIME_BUDGET_MAX) {
 				RECURSION_LEVEL--;
 #ifdef DEBUG
-				std::cout << "Disminuint dificultat (" << RECURSION_LEVEL << ")" << std::endl;
+				std::cout << "Lowering difficulty (" << RECURSION_LEVEL << ")" << std::endl;
 #endif
 			}
 #ifdef DEBUG
-			std::cout << "Memoizes utilitzats: " << used_memoizes << std::endl;
+			std::cout << "Memoized values used: " << used_memoizes << std::endl;
 #endif
 
-			// Anem fent espai a la taula de memoització per acomodar noves jugades i anar eliminar les branques impossibles (random)
+#ifdef MEMOIZE_ENABLED
+			// Delete memoization table items when the table is full. Randomly select 1/4 of the table for deletion.
 			if (t.memoize->size() >= MEMOIZE_MAX_SIZE) {
+#ifdef DEBUG
+			std::cout << "Memoize table is full. Pruning " << used_memoizes << std::endl;
+#endif
 				auto quart = std::distance(t.memoize->begin(),t.memoize->end()) / 4;
 				auto it1 = t.memoize->begin();
 				auto it2 = t.memoize->begin();
@@ -744,10 +788,8 @@ int main(int argc, char**argv) {
 				}
 				last_eviction = (last_eviction + 1) % 4;
 			}
-#ifdef DEBUG
-			//used_memoizes = 0;
 #endif
-			// els taulells especulatius son inutils ja, la propera iteració en crearem de nous a partir de copies de l'actual.
+			// Speculative boards can be deleted now, as we will create them anew the next iteration.
 			for (int i=0; i<6; i++) {
 				if (spec[i]) {
 					delete spec[i];
