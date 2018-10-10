@@ -451,19 +451,9 @@ int joc::getValue(const signed char jug) {
 	ret += punts[jug] * MATADES_MULT;
 	ret -= punts[altre] * MORTES_MULT;
 
-	// Heuristic 4
+	// Heuristic 4. Si l'altre no pot moure, no es culpa nostra (controlat a mou())
 	if (num_fitxes_altre == 0) {
-		// Primer mirem si estem obligats a donar
-		bool couldhaveplayed=false;
-		for (int idx=0; idx<6; idx++) {
-			couldhaveplayed=couldhaveplayed || (taulell[i][jug] > i);
-		}
-		if (couldhaveplayed) {
-			return (ret+INT_MIN/4 > INT_MIN)? ret+INT_MIN/4: INT_MIN+1;
-		}
-		else {
-			ret += num_fitxes_jug * MATADES_MULT;
-		}
+		ret += num_fitxes_jug * MATADES_MULT;
 	}
 
 
