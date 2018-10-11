@@ -1,12 +1,12 @@
 // Identifiers for self and rival
-#define RIVAL 0
-#define MYSELF 1
+#define THEM 0
+#define ME 1
 
 // Print mode, stdio for human vs IA, piped for IA vs IA
 #define HUMAN 0
 #define MACHINE 1
 
-#define BOARD_MODE RIVAL 
+#define BOARD_MODE THEM 
 #define PRINT_MODE HUMAN
 //#define PRINT_MODE MACHINE
 
@@ -171,10 +171,10 @@ template <>
 
 class joc {
 	public:
-		signed char taulell[6][2];
-		int punts[2];
+		signed char board[6][2];
+		int score[2];
 		bool mou(short pos, signed char jug);
-		int ia(const signed char jug, unsigned short rec, const uint8_t path=0);
+		int ia(const signed char jug, uint8_t rec, const uint8_t path=0);
 		joc* copy();
 		short getMove();
 		void print();
@@ -203,7 +203,7 @@ IDj joc::getId(const signed char jug) {
 	IDj id;
 	for (int j=0; j<2; j++) {
 		for (int i=0; i<6; i++) {
-			id.t.c[i+j*8] = taulell[i][(jug+j)%2];
+			id.t.c[i+j*8] = board[i][(jug+j)%2];
 		}
 	}
 	return id;
@@ -211,7 +211,7 @@ IDj joc::getId(const signed char jug) {
 
 bool joc::mou(short pos, signed char jug) {
 	bool cangive = false;
-	short fitxes = taulell[pos][jug];
+	short fitxes = board[pos][jug];
 	short fitxes_rival = 0;
 	const signed char jug_ini = jug;
 	const short pos_ini = pos;
@@ -221,10 +221,10 @@ bool joc::mou(short pos, signed char jug) {
 	}
 
 	for (int i=0; i<6; i++) {
-		cangive = cangive || taulell[i][jug] > i;
+		cangive = cangive || board[i][jug] > i;
 	}
 
-	taulell[pos][jug] = 0;
+	board[pos][jug] = 0;
 	
 	while (fitxes > 0) {
 		if (pos == 0) {
@@ -236,29 +236,29 @@ bool joc::mou(short pos, signed char jug) {
 		}
 
 		if (pos != pos_ini || jug != jug_ini) {
-			taulell[pos][jug]++;
+			board[pos][jug]++;
 			fitxes--;
 		}
 	}
 
 	// Matar
 	if (jug != jug_ini) {
-		while (pos <6 && (taulell[pos][jug] == 3 || taulell[pos][jug] == 2)) {
-			punts[jug_ini] += taulell[pos][jug];
-			taulell[pos][jug] = 0;
+		while (pos < 6 && (board[pos][jug] == 3 || board[pos][jug] == 2)) {
+			score[jug_ini] += board[pos][jug];
+			board[pos][jug] = 0;
 			pos++;
 		}
 	}
 
 	// Can't starve opponent 
 	for (int i=0; i<6; i++) {
-		fitxes_rival = fitxes_rival + taulell[i][(jug_ini+1)%2];
+		fitxes_rival = fitxes_rival + board[i][(jug_ini+1)%2];
 	}
 
 	return !(fitxes_rival == 0 && cangive);
 }
 
-int joc::ia(const signed char jug, unsigned short rec, const uint8_t path) {
+int joc::ia(const signed char jug, uint8_t rec, const uint8_t path) {
 	int value = INT_MIN;
 	long long int anti_val, valor_actual;
 	short pos;
@@ -309,15 +309,15 @@ int joc::ia(const signed char jug, unsigned short rec, const uint8_t path) {
 	}
 
 	for (pos=0; pos < 6; pos++) {
-		if (taulell[pos][jug] > 0) {
+		if (board[pos][jug] > 0) {
 			joc *c = this->copy();
 			if (! c->mou(pos, jug) ) {
 				delete c;
 				continue;
 			}
 			anti_val = c->ia((jug+1)%2, rec-1, path);
-			int valor_actual_ = (valor_actual-anti_val>INT_MIN)? valor_actual-anti_val: INT_MIN;
-			int valor_actual = (valor_actual-anti_val<INT_MAX)? valor_actual_: INT_MAX;
+			int valor_actual_tmp = (valor_actual-anti_val>INT_MIN)? valor_actual-anti_val: INT_MIN;
+			valor_actual = (valor_actual-anti_val<INT_MAX)? valor_actual_tmp: INT_MAX;
 			if (valor_actual > value || moviment == -1) {
 				moviment = pos;
 				value = valor_actual;
@@ -334,38 +334,46 @@ int joc::ia(const signed char jug, unsigned short rec, const uint8_t path) {
 		for(int i=RECURSION_LEVEL-rec; i>0; i--) {
 			std::cout << " ";
 		}
-		if (jug == MYSELF)
-			std::cout << "MYSELF  ";
+		if (jug == ME)
+			std::cout << "ME  ";
 		else
-			std::cout << "RIVAL ";
+			std::cout << "THEM ";
 		std::cout << value << std::endl;
 	}
 	
 	/*if (rec >= RECURSION_LEVEL-1) {
-		if (jug == MYSELF)
-			std::cout << "MYSELF  ";
+		if (jug == ME)
+			std::cout << "ME  ";
 		else
-			std::cout << "RIVAL ";
+			std::cout << "THEM ";
 		std::cout << "(" << moviment+1 <<") " << value << std::endl;
 	}*/
 #endif
 
 	if (moviment == -1) {
-		// Ho tornem a mirar, per si un cas. Això no cal i es pot esborrar.
-		if (taulell[0][jug] > 0)
+		// We may not find a move because we can't move without starving. If so, do whatever, as we are forced to starve opponent.
+		if (board[0][jug] > 0) {
 			moviment = 0;
-		else if (taulell[1][jug] > 0)
+		}
+		else if (board[1][jug] > 0) {
 			moviment = 1;
-		else if (taulell[2][jug] > 0)
+		}
+		else if (board[2][jug] > 0) {
 			moviment = 2;
-		else if (taulell[3][jug] > 0)
+		}
+		else if (board[3][jug] > 0) {
 			moviment = 3;
-		else if (taulell[4][jug] > 0)
+		}
+		else if (board[4][jug] > 0) {
 			moviment = 4;
-		else if (taulell[5][jug] > 0)
+		}
+		else if (board[5][jug] > 0) {
 			moviment = 5;
-		else
-			value=0; // Victoria perque no podem fer moviments? Depen de si l'altre estava obligat o no a donar-nos fitxes
+		}
+		else {
+			// If we can't move, the opponent gets every remaining piece on the board. 
+			value=value-(MORTES_MULT)*(48-score[ME]-score[THEM]);
+		}
 	}
 
 #ifdef MEMOIZE_ENABLED
@@ -386,10 +394,10 @@ int joc::ia(const signed char jug, unsigned short rec, const uint8_t path) {
 
 joc* joc::copy() {
 	joc *r = new joc();
-	memcpy(r->taulell, this->taulell, 12*sizeof(signed char));
+	memcpy(r->board, this->board, 12*sizeof(signed char));
 	r->moviment = -1;
-	r->punts[MYSELF] = this->punts[MYSELF];
-	r->punts[RIVAL] = this->punts[RIVAL];
+	r->score[ME] = this->score[ME];
+	r->score[THEM] = this->score[THEM];
 	r->memoize = this->memoize;
 	return r;
 }
@@ -406,13 +414,13 @@ int joc::getValue(const signed char jug) {
 
 	for (j=0; j<2; j++) {
 		for (i=0; i<6; i++) {
-			// Heuristic 1: taulell ilegal 
-			if (taulell[i][j] < 0) {
+			// Heuristic 1: board ilegal 
+			if (board[i][j] < 0) {
 				return INT_MIN;
 			}
 
 			// Heuristic 2: 2 o 3 fitxes
-			if (taulell[i][j] == 2 || taulell[i][j] == 1) {
+			if (board[i][j] == 2 || board[i][j] == 1) {
 				if (j == altre)
 					ret += _12AWARD;
 				else
@@ -421,33 +429,33 @@ int joc::getValue(const signed char jug) {
 
 			// Heuristic 4: obligat a donar fitxes
 			if (j == altre)
-				num_fitxes_altre += taulell[i][j];
+				num_fitxes_altre += board[i][j];
 			else
-				num_fitxes_jug += taulell[i][j];
+				num_fitxes_jug += board[i][j];
 
 			//Heuristic 8: espais buits
-			if (j == jug && taulell[i][j] == 0)
+			if (j == jug && board[i][j] == 0)
 				ret -= ESPAISBUITS_PENALTY;
 
 			//Heuristic 9: Flow
-			if (j == jug && i - taulell[i][j] > 0) {
+			if (j == jug && i - board[i][j] > 0) {
 				ret += FLOW_AWARD;
 			}
 
 			//Heuristic 10: 2 0 seguits
-			if (i>0 && j==jug && taulell[i][j] == 0 && taulell[i-1][j] == 0) {
+			if (i>0 && j==jug && board[i][j] == 0 && board[i-1][j] == 0) {
 				ret -= DOBLEZERO_PENALTY;
 			}
 
 			// Heuristic 11: rival acumulant fitxes
-			if (j == altre && taulell[i][j] > 11+i) {
-				ret -= (taulell[i][j] - 11-i) * ACUM_PENALTY;
+			if (j == altre && board[i][j] > 11+i) {
+				ret -= (board[i][j] - 11-i) * ACUM_PENALTY;
 			}
 		}
 	}
 
-	ret += punts[jug] * MATADES_MULT;
-	ret -= punts[altre] * MORTES_MULT;
+	ret += score[jug] * MATADES_MULT;
+	ret -= score[altre] * MORTES_MULT;
 
 	// Heuristic 4. Si l'altre no pot moure, no es culpa nostra (controlat a mou())
 	if (num_fitxes_altre == 0) {
@@ -456,13 +464,11 @@ int joc::getValue(const signed char jug) {
 
 
 	// Heuristic 6: Partida perduda
-	if (punts[altre] >= 25)
-		//ret -= punts[altre] * MORTES_MULT;
+	if (score[altre] >= 25)
 		return (ret+INT_MIN/4 > INT_MIN)? ret+INT_MIN/4: INT_MIN+1;
 
 	// Heuristic 7: Partida guanyada
-	if (punts[jug] >= 25)
-		//ret += punts[jug] * MATADES_MULT;
+	if (score[jug] >= 25)
 		return (ret+INT_MAX/4 < INT_MAX)? ret+INT_MAX/4: INT_MAX-1;
 
 	// Heuristic 3: mes fitxes que l'adversari
@@ -475,29 +481,29 @@ int joc::getValue(const signed char jug) {
 void joc::print() {
 	int i;
 
-#if BOARD_MODE == MYSELF
+#if BOARD_MODE == ME
 /*	std::cout << "1 2 3 4 5 6" << std::endl;
 	std::cout << "-----------" << std::endl;*/
 	for (i=0; i<6; i++) {
-		std::cout << (signed)taulell[i][RIVAL] <<" ";
+		std::cout << (signed)board[i][THEM] <<" ";
 	}
 	std::cout << std::endl;
 	for (i=5; i>=0; i--) {
-		std::cout << (signed)taulell[i][MYSELF] <<" ";
+		std::cout << (signed)board[i][ME] <<" ";
 	}
 #else
 	for (i=0; i<6; i++) {
-		std::cout << (signed)taulell[i][MYSELF] <<" ";
+		std::cout << (signed)board[i][ME] <<" ";
 	}
 	std::cout << std::endl;
 	for (i=5; i>=0; i--) {
-		std::cout << (signed)taulell[i][RIVAL] <<" ";
+		std::cout << (signed)board[i][THEM] <<" ";
 	}
 /*	std::cout << std::endl << "-----------";
 	std::cout << std::endl << "6 5 4 3 2 1";*/
 #endif
 	std::cout << std::endl;
-	std::cout << "Score: MYSELF=" << punts[MYSELF] << " RIVAL=" << punts[RIVAL] << std::endl;
+	std::cout << "Score: ME=" << score[ME] << " THEM=" << score[THEM] << std::endl;
 }
 
 void joc::ini() {
@@ -505,11 +511,11 @@ void joc::ini() {
 
 	for (i=0; i<6; i++) {
 		for (j=0; j<2; j++) {
-			taulell[i][j] = 4;
+			board[i][j] = 4;
 		}
 	}
-	punts[MYSELF] = 0;
-	punts[RIVAL] = 0;
+	score[ME] = 0;
+	score[THEM] = 0;
 }
 
 
@@ -545,10 +551,10 @@ int main(int argc, char**argv) {
 	while ((c = getopt (argc, argv, "p:a:d:m:")) != -1) {
 		switch(c) {
 			case 'p':
-				if (!strcmp(optarg, "MYSELF"))
-					primer = "MYSELF";
+				if (!strcmp(optarg, "ME"))
+					primer = "ME";
 				else 
-					primer = "RIVAL";
+					primer = "THEM";
 				break;
 			case 'd':
 				MORTES_MULT = atoi(optarg);
@@ -576,7 +582,7 @@ int main(int argc, char**argv) {
 
 
 #ifdef DEBUG
-	std::cout << "Nivell d'agressivitat: " << MATADES_MULT << "/" << MORTES_MULT << std::endl << std::endl;
+	std::cout << "Agression level: " << MATADES_MULT << "/" << MORTES_MULT << std::endl << std::endl;
 #endif
 
 	t.ini();
@@ -591,7 +597,7 @@ int main(int argc, char**argv) {
 #endif
 
 	if (primer == "") {
-		std::cout << "Qui comença? [MYSELF/RIVAL] ";
+		std::cout << "Qui comença? [ME/THEM] ";
 		std::cin >> primer;
 	}
 #if PRINT_MODE == MACHINE
@@ -600,7 +606,7 @@ int main(int argc, char**argv) {
 	const char *fifo2= "/tmp/awale2";
 	mkfifo(fifo1, 0666);
 	mkfifo(fifo2, 0666);
-	if (primer == "MYSELF") {
+	if (primer == "ME") {
 		pipe_r = open(fifo1, O_RDONLY);
 		pipe_w = open(fifo2, O_WRONLY);
 	}
@@ -613,10 +619,10 @@ int main(int argc, char**argv) {
 #endif
 
 
-	if (primer == "MYSELF") {
+	if (primer == "ME") {
 		g_clock_ticking = true;
 		t.print();
-		t.ia(MYSELF, RECURSION_LEVEL);
+		t.ia(ME, RECURSION_LEVEL);
 		std::cout << "Mou desde ";
 		std::cout << t.getMove()+1 << std::endl;
 #if PRINT_MODE == MACHINE
@@ -624,7 +630,7 @@ int main(int argc, char**argv) {
 		snprintf(buf, sizeof(buf), "%d", t.getMove()+1);
 		write(pipe_w, buf, sizeof(buf));
 #endif
-		if (!t.mou(t.getMove(), MYSELF)) {
+		if (!t.mou(t.getMove(), ME)) {
 			std::cout << "Invalid move: " << (int)pos+1 << std::endl;
 		}
 		jugada++;
@@ -634,7 +640,7 @@ int main(int argc, char**argv) {
 		g_terminate = 0;
 		g_clock_ticking = false;
 #if PRINT_MODE == MACHINE
-		if (t.punts[MYSELF] > 24 || t.punts[RIVAL] > 24) {
+		if (t.score[ME] > 24 || t.score[THEM] > 24) {
 			t.print();
 			exit(0);
 		}
@@ -644,8 +650,8 @@ int main(int argc, char**argv) {
 		for (int i=0; i<6; i++) {
 			// Generate 6 games with each possible play by the opponent. Launch threaded execution.
 			spec[i] = t.copy();
-			if (spec[i]->mou(i, RIVAL)) {
-				th[i] = new std::thread(&joc::ia, spec[i], MYSELF, RECURSION_LEVEL, i+1);
+			if (spec[i]->mou(i, THEM)) {
+				th[i] = new std::thread(&joc::ia, spec[i], ME, RECURSION_LEVEL, i+1);
 			}
 			else {
 				// Illegal move, discard
@@ -680,7 +686,7 @@ int main(int argc, char**argv) {
 		pos = atoi(buf);
 		std::cout << pos << std::endl;
 #endif
-		bool ok = t.mou(pos-1, RIVAL);
+		bool ok = t.mou(pos-1, THEM);
 		if (ok)  {
 			jugada++;
 			t.print();
@@ -690,7 +696,7 @@ int main(int argc, char**argv) {
 			g_clock_ticking = true;
 			// Join 'pos' thread. Kill the rest later.
 			th[pos-1]->join();
-			assert(t.mou(spec[pos-1]->getMove(), MYSELF));
+			assert(t.mou(spec[pos-1]->getMove(), ME));
 			g_clock_ticking = false;
 
 			// End condition
@@ -698,10 +704,10 @@ int main(int argc, char**argv) {
 				int fitxes_fi = 0;
 				std::cout << std::endl << "No more moves. Game is over." << std::endl;
 				for (int i=0; i<6; i++) {
-					fitxes_fi += t.taulell[i][RIVAL];
+					fitxes_fi += t.board[i][THEM];
 				}
-				t.punts[RIVAL] += fitxes_fi; 
-				std::cout << "Score: MYSELF=" << t.punts[MYSELF] << " RIVAL=" << t.punts[RIVAL] << std::endl;
+				t.score[THEM] += fitxes_fi; 
+				std::cout << "Score: ME=" << t.score[ME] << " THEM=" << t.score[THEM] << std::endl;
 				return 0;
 			}
 
