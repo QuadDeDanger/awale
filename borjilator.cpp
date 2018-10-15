@@ -82,30 +82,51 @@ typedef union ID {
 class IDj {
 	public:
 	ID t;
+	int score[2];
 	friend bool operator==(IDj &a, IDj &b);
 	friend bool operator!=(IDj &a, IDj &b);
 	IDj() {
 		t.l[0] = 0;
 		t.l[1] = 0;
+		score[0] = 0;
+		score[1] = 0;
 	}
 };
 bool operator==(IDj &a, IDj &b){
-	return (a.t.l[0] == b.t.l[0] && a.t.l[1] == b.t.l[1]);
+	return (a.t.l[0] == b.t.l[0] && a.t.l[1] == b.t.l[1] && a.score[0] == b.score[0] && a.score[1] == b.score[1]);
 }
 bool operator==(const IDj &a, const IDj &b){
-	return (a.t.l[0] == b.t.l[0] && a.t.l[1] == b.t.l[1]);
+	return (a.t.l[0] == b.t.l[0] && a.t.l[1] == b.t.l[1] && a.score[0] == b.score[0] && a.score[1] == b.score[1]);
 }
 bool operator!=(IDj &a, IDj &b){
-	return !(a.t.l[0] == b.t.l[0] && a.t.l[1] == b.t.l[1]);
+	return !(a.t.l[0] == b.t.l[0] && a.t.l[1] == b.t.l[1] && a.score[0] == b.score[0] && a.score[1] == b.score[1]);
 }
 std::istream& operator>>(std::istream &in, IDj &a) {
+	char i1[4];
+	char i2[4];
+	a.score[0] = 0;
+	a.score[1] = 0;
 	in.read((char*)a.t.c, 6*sizeof(uint8_t));
 	in.read((char*)&a.t.c[8], 6*sizeof(uint8_t));
+	in.read(i1, sizeof(int));
+	in.read(i2, sizeof(int));
+	for (int i = 0; i < sizeof(int); i++) {
+		a.score[0] = (a.score[0]<<8) + (unsigned char)i1[i];
+		a.score[1] = (a.score[1]<<8) + (unsigned char)i2[i];
+	}
 	return in;
 }
 std::ostream& operator<<(std::ostream &out, IDj &a) {
+	char i1[4];
+	char i2[4];
 	out.write((char*)a.t.c, 6*sizeof(uint8_t));
 	out.write((char*)&a.t.c[8], 6*sizeof(uint8_t));
+	for (int i = 0; i < sizeof(int); i++){
+		i1[3 - i] = (a.score[0] >> (i * 8));
+		i2[3 - i] = (a.score[1] >> (i * 8));
+	}
+	out.write(i1, sizeof(int));
+	out.write(i2, sizeof(int));
 	return out;
 }
 /*std::ostream& operator<<(std::ostream &out, const IDj &a) {
@@ -162,7 +183,7 @@ template <>
     };
     size_t hash<IDj>::operator()(const IDj &x ) const
     {
-        size_t h = std::hash<uint64_t>()(x.t.l[0]) ^ std::hash<uint64_t>()(x.t.l[1] << 16);
+        size_t h = std::hash<uint64_t>()(x.t.l[0]) ^ std::hash<uint64_t>()(x.t.l[1]<<16) ^ std::hash<uint64_t>()(x.score[0]) ^ std::hash<uint64_t>()((int64_t)(x.score[1])<<32);
         return  h;
     }
 }
@@ -190,8 +211,8 @@ class joc {
 
 std::string joc::id2str(const IDj &a) {
 	std::stringstream out;
-	out << "C=" << (int)a.t.c[0] << " " << (int)a.t.c[1] << " " << (int)a.t.c[2] << " " <<  (int)a.t.c[3] << " " <<  (int)a.t.c[4] << " " << (int)a.t.c[5] << " " << std::endl;
-	out << "C=" << (int)a.t.c[8] << " " << (int)a.t.c[9] << " " << (int)a.t.c[10] << " " <<  (int)a.t.c[11] << " " <<  (int)a.t.c[12] << " " << (int)a.t.c[13] << " " << std::endl;
+	out << "A=" << (int)a.t.c[0] << " " << (int)a.t.c[1] << " " << (int)a.t.c[2] << " " <<  (int)a.t.c[3] << " " <<  (int)a.t.c[4] << " " << (int)a.t.c[5] << " (" << a.score[0] << ")" << std::endl;
+	out << "B=" << (int)a.t.c[8] << " " << (int)a.t.c[9] << " " << (int)a.t.c[10] << " " <<  (int)a.t.c[11] << " " <<  (int)a.t.c[12] << " " << (int)a.t.c[13] << " (" << a.score[1] << ")" << std::endl;
 	return out.str();
 }
 short joc::getMove() {
@@ -206,6 +227,8 @@ IDj joc::getId(const signed char jug) {
 			id.t.c[i+j*8] = board[i][(jug+j)%2];
 		}
 	}
+	id.score[0] == this->score[jug];
+	id.score[1] == this->score[(jug+1)%2];
 	return id;
 }
 
@@ -321,7 +344,6 @@ int joc::ia(const signed char jug, uint8_t rec, const uint8_t path) {
 			if (valor_actual > value || moviment == -1) {
 				moviment = pos;
 				value = valor_actual;
-
 			}
 			delete c;
 		}
@@ -462,7 +484,6 @@ int joc::getValue(const signed char jug) {
 		ret += num_fitxes_jug * MATADES_MULT;
 	}
 
-
 	// Heuristic 6: Partida perduda
 	if (score[altre] >= 25)
 		return (ret+INT_MIN/4 > INT_MIN)? ret+INT_MIN/4: INT_MIN+1;
@@ -522,14 +543,16 @@ void joc::ini() {
 std::unordered_map<IDj, std::tuple<int,short,unsigned short> >* load_memoize(std::string filename) {
 	std::unordered_map<IDj, std::tuple<int, short, unsigned short> > *ret = new std::unordered_map<IDj, std::tuple<int, short, unsigned short> >;
 	IDj key;
-	std::tuple <int, short, unsigned short> valmovret;
+	std::tuple <int, short, unsigned short> valmovrec;
 	std::ifstream file;
 	file.open(filename, std::ios::in |std::ios::binary);
 	std::cout << "Loading from " << filename << "..." << std::endl;;
 	while (!file.eof() && !file.fail()) {
-		file >> key >> valmovret;
-//		std::cout << "RET SIZE=" << ret->size() << " KEY=" << key<< " VALUE=" << valmov.first << "," << valmov.second << std::endl;
-		(*ret)[key] = valmovret;
+		file >> key >> valmovrec;
+		// easy fast check to detect data corruption
+		if (std::get<1>(valmovrec) >= 0 && std::get<1>(valmovrec) < 6) {
+			(*ret)[key] = valmovrec;
+		}
 	}
 	std::cout << ret->size() << " values loaded." << std::endl;
 	return ret;
