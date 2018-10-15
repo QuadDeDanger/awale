@@ -1,16 +1,4 @@
-// Identifiers for self and rival
-#define THEM 0
-#define ME 1
-
-// Print mode, stdio for human vs IA, piped for IA vs IA
-#define HUMAN 0
-#define MACHINE 1
-
-#define BOARD_MODE THEM 
-#define PRINT_MODE HUMAN
-//#define PRINT_MODE MACHINE
-
-#define MEMOIZE_ENABLED
+#include "constants.h"
 
 #include <climits>
 #include <stdint.h>
@@ -37,28 +25,6 @@
 int RECURSION_LEVEL = 13;
 int MATADES_MULT = 300;
 int MORTES_MULT = 400;
-// MIN_RECURSION: minimum number of recursions before we allow killing the thread
-#define MIN_RECURSION 9
-#define MAX_RECURSION 19
-// TIME_BUDGET_HINT: time limit before we start to finish the process. In ms
-#define TIME_BUDGET_HINT 1000
-#define TIME_BUDGET_MIN TIME_BUDGET_HINT 
-#define TIME_BUDGET_MAX (TIME_BUDGET_MIN*1.5)
-
-#define MEMOIZE_MAX_SIZE 50000000
-
-#define _12AWARD 1
-#define _12PENALTY 1
-#define MESFITXES_MULT 1
-#define ESPAISBUITS_PENALTY 5
-#define FLOW_AWARD 5
-#define DOBLEZERO_PENALTY 10
-#define ACUM_PENALTY 16
-#define PODA (INT_MIN/2)
-#define PODA_PENALTY 0 
-
-#define MIN(a,b) (a<b?a:b)
-#define MAX(a,b) (a>b?a:b)
 
 static short g_terminate = 0;
 static bool g_clock_ticking = true;
@@ -174,7 +140,7 @@ std::ostream& operator<<(std::ostream &out, std::tuple<int,short,unsigned short>
 	return out;
 }
 
-// Operació de hash per a poder fer servir IDj com a index del map de memoitzacio
+// Hash function to enable use of IDj as a map index for the memoization table
 namespace std {
 template <>
     struct hash <IDj>{
@@ -264,7 +230,7 @@ bool joc::mou(short pos, signed char jug) {
 		}
 	}
 
-	// Matar
+	// Capture seeds 
 	if (jug != jug_ini) {
 		while (pos < 6 && (board[pos][jug] == 3 || board[pos][jug] == 2)) {
 			score[jug_ini] += board[pos][jug];
@@ -669,7 +635,7 @@ int main(int argc, char**argv) {
 		}
 #endif
 
-		// multithread while waiting for rival 
+		// Multithread while waiting for rival 
 		for (int i=0; i<6; i++) {
 			// Generate 6 games with each possible play by the opponent. Launch threaded execution.
 			spec[i] = t.copy();
