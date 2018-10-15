@@ -13,8 +13,11 @@ borjilator: borjilator.cpp
 borjilator-dbg: borjilator.cpp
 	$(CXX) $(CFLAGS_DBG) $(LDFLAGS) $^ -o $@
 
+borjilator-gprof: borjilator.cpp
+	$(CXX) -pg $(CFLAGS) $(LDFLAGS) $^ -o $@
+
 memtrainer: memtrainer.cpp
 	$(CXX) $(CFLAGS_DBG) $^ $(LDFLAGS) -o $@
 
 clean:
-	rm borjilator borjilator_dbg
+	rm -f borjilator borjilator-dbg borjilator-gprof
