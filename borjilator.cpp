@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <signal.h>
 #endif
 int RECURSION_LEVEL = 13;
 int MATADES_MULT = 300;
@@ -593,6 +594,7 @@ int main(int argc, char**argv) {
 	int pipe_r, pipe_w;
 	const char *fifo1= "/tmp/awale1";
 	const char *fifo2= "/tmp/awale2";
+	signal(SIGPIPE, SIG_IGN);
 	mkfifo(fifo1, 0666);
 	mkfifo(fifo2, 0666);
 	if (primer == "ME") {
@@ -617,7 +619,11 @@ int main(int argc, char**argv) {
 #if PRINT_MODE == MACHINE
 		char buf[16];
 		snprintf(buf, sizeof(buf), "%d", t.getMove()+1);
-		write(pipe_w, buf, sizeof(buf));
+		ssize_t pipecheck = write(pipe_w, buf, sizeof(buf));
+		if (pipecheck <= 0) {
+			std::cout << "Pipe broken, exiting." << std::endl;
+			exit(0);
+		}
 #endif
 		if (!t.mou(t.getMove(), ME)) {
 			std::cout << "Invalid move: " << (int)pos+1 << std::endl;
@@ -671,7 +677,11 @@ int main(int argc, char**argv) {
 #endif
 #if PRINT_MODE == MACHINE
 		char buf[16];
-		read(pipe_r, buf, 16);
+		ssize_t pipecheck = read(pipe_r, buf, 16);
+		if (pipecheck <= 0) {
+			std::cout << "Pipe broken, exiting." << std::endl;
+			exit(0);
+		}
 		pos = atoi(buf);
 		std::cout << pos << std::endl;
 #endif
@@ -705,7 +715,11 @@ int main(int argc, char**argv) {
 #if PRINT_MODE == MACHINE
 			char buf[16];
 			snprintf(buf, sizeof(buf), "%d", spec[pos-1]->getMove()+1);
-			write(pipe_w, buf, sizeof(buf));
+			ssize_t pipecheck = write(pipe_w, buf, sizeof(buf));
+			if (pipecheck <= 0) {
+				std::cout << "Pipe broken, exiting." << std::endl;
+				exit(0);
+			}
 #endif
 			jugada++;
 			// Wait for the rest of the threads to continue 
