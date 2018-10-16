@@ -144,15 +144,15 @@ std::ostream& operator<<(std::ostream &out, std::tuple<int,short,unsigned short>
 // Hash function to enable use of IDj as a map index for the memoization table
 namespace std {
 template <>
-    struct hash <IDj>{
-    public :
-        size_t operator()(const IDj &x ) const;
-    };
-    size_t hash<IDj>::operator()(const IDj &x ) const
-    {
-        size_t h = std::hash<uint64_t>()(x.t.l[0]) ^ std::hash<uint64_t>()(x.t.l[1]<<16) ^ std::hash<uint64_t>()(x.score[0]) ^ std::hash<uint64_t>()((int64_t)(x.score[1])<<32);
-        return  h;
-    }
+	struct hash <IDj>{
+	public :
+		size_t operator()(const IDj &x ) const;
+	};
+	size_t hash<IDj>::operator()(const IDj &x ) const
+	{
+	        size_t h = std::hash<uint64_t>()(x.t.l[0]) ^ std::hash<uint64_t>()(~(x.t.l[1]<<16))^ std::hash<uint64_t>()(~x.score[0]) ^ std::hash<uint64_t>()((int64_t)(~(x.score[1])<<4));
+		return  h;
+	}
 }
 
 
