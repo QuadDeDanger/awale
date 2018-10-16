@@ -1,18 +1,4 @@
-#include "constants.h"
-
-#include <climits>
-#include <stdint.h>
-#include <assert.h>
-#include <iostream>
-#include <fstream>
-#include <unordered_map>
-#include <iterator>
-#include <thread>
-#include <shared_mutex>
-#include <string.h>
-#include <sstream>
-#include <time.h>
-#include <getopt.h>
+#include "borjilator.hpp"
 
 #if PRINT_MODE == MACHINE
 #include <fcntl.h>
@@ -150,7 +136,7 @@ template <>
 	};
 	size_t hash<IDj>::operator()(const IDj &x ) const
 	{
-	        size_t h = std::hash<uint64_t>()(x.t.l[0]) ^ std::hash<uint64_t>()(~(x.t.l[1]<<16))^ std::hash<uint64_t>()(~x.score[0]) ^ std::hash<uint64_t>()((int64_t)(~(x.score[1])<<4));
+	        size_t h = std::hash<uint64_t>()((x.t.l[0]) + (~(x.t.l[1]<<16))) ^ std::hash<uint64_t>()(~x.score[0]) ^ std::hash<uint64_t>()((int64_t)(~(x.score[1])<<4));
 		return  h;
 	}
 }
@@ -194,8 +180,8 @@ IDj joc::getId(const signed char jug) {
 			id.t.c[i+j*8] = board[i][(jug+j)%2];
 		}
 	}
-	id.score[0] == this->score[jug];
-	id.score[1] == this->score[(jug+1)%2];
+	id.score[0] = score[jug];
+	id.score[1] = score[(jug+1)%2];
 	return id;
 }
 
