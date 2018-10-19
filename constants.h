@@ -7,13 +7,14 @@
 #define MACHINE 1
 
 #define BOARD_MODE THEM 
-#define PRINT_MODE HUMAN
-//#define PRINT_MODE MACHINE
 
-#define MEMOIZE_ENABLED
+#ifndef PRINT_MODE
+#error Please define PRINT_MODE to HUMAN or MACHINE in your Makefile
+#endif
 
 // MIN_RECURSION: minimum number of recursions before we allow killing the thread
-#define MIN_RECURSION 9
+// also servers as a threshold for the memoization table
+#define MIN_RECURSION 8
 #define MAX_RECURSION 19
 // TIME_BUDGET_HINT: time limit before we start to finish the process. In ms
 #define TIME_BUDGET_HINT 1000

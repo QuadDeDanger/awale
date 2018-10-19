@@ -25,26 +25,6 @@ static std::mutex mtx2;
 
 static std::shared_mutex mtx;
 
-typedef union ID {
-	uint64_t l[2];
-	uint32_t i[4];
-	uint16_t s[8];
-	uint8_t c[16];
-} ID;
-
-class IDj {
-	public:
-	ID t;
-	int score[2];
-	friend bool operator==(IDj &a, IDj &b);
-	friend bool operator!=(IDj &a, IDj &b);
-	IDj() {
-		t.l[0] = 0;
-		t.l[1] = 0;
-		score[0] = 0;
-		score[1] = 0;
-	}
-};
 bool operator==(IDj &a, IDj &b){
 	return (a.t.l[0] == b.t.l[0] && a.t.l[1] == b.t.l[1] && a.score[0] == b.score[0] && a.score[1] == b.score[1]);
 }
@@ -55,31 +35,16 @@ bool operator!=(IDj &a, IDj &b){
 	return !(a.t.l[0] == b.t.l[0] && a.t.l[1] == b.t.l[1] && a.score[0] == b.score[0] && a.score[1] == b.score[1]);
 }
 std::istream& operator>>(std::istream &in, IDj &a) {
-	char i1[4];
-	char i2[4];
-	a.score[0] = 0;
-	a.score[1] = 0;
 	in.read((char*)a.t.c, 6*sizeof(uint8_t));
 	in.read((char*)&a.t.c[8], 6*sizeof(uint8_t));
-	in.read(i1, sizeof(int));
-	in.read(i2, sizeof(int));
-	for (int i = 0; i < sizeof(int); i++) {
-		a.score[0] = (a.score[0]<<8) + (unsigned char)i1[i];
-		a.score[1] = (a.score[1]<<8) + (unsigned char)i2[i];
-	}
+	in.read((char*)&a.score[0], sizeof(uint8_t));
+	in.read((char*)&a.score[1], sizeof(uint8_t));
 	return in;
 }
 std::ostream& operator<<(std::ostream &out, IDj &a) {
-	char i1[4];
-	char i2[4];
 	out.write((char*)a.t.c, 6*sizeof(uint8_t));
 	out.write((char*)&a.t.c[8], 6*sizeof(uint8_t));
-	for (int i = 0; i < sizeof(int); i++){
-		i1[3 - i] = (a.score[0] >> (i * 8));
-		i2[3 - i] = (a.score[1] >> (i * 8));
-	}
-	out.write(i1, sizeof(int));
-	out.write(i2, sizeof(int));
+	out.write((char*)a.score, 2*sizeof(uint8_t));
 	return out;
 }
 /*std::ostream& operator<<(std::ostream &out, const IDj &a) {
@@ -92,38 +57,38 @@ std::ostream& operator<<(std::ostream &out, IDj &a) {
 }*/
 std::istream& operator>>(std::istream &in, std::tuple<int,short,unsigned short> &vmr) {
 	char v[4];
-	int vv=0;
 	char m[2];
-	short mm=0;
 	char r[2];
-	unsigned short rr=0;
-	in.read(v, sizeof(int));
-	in.read(m, sizeof(short));
-	in.read(r, sizeof(unsigned short));
-	for (int i = 0; i < sizeof(int); i++)
-		vv = (vv<<8) + (unsigned char)v[i];
-	for (int i = 0; i < sizeof(short); i++)
-		mm = (mm<<8) + (unsigned char)m[i];
-	for (int i = 0; i < sizeof(unsigned short); i++)
-		rr = (rr<<8) + (unsigned char)r[i];
-
-	vmr = std::make_tuple(vv, mm, rr);
+	in.read(v, vsize);
+	in.read(m, msize);
+	in.read(r, rsize);
+	for (int i = 0; i < vsize; i++)
+		vmr.v = (vmr.v<<8) + (unsigned char)v[i];
+	for (int i = 0; i < msize; i++)
+		vmr.m = (vmr.m<<8) + (unsigned char)m[i];
+	for (int i = 0; i < rsize; i++)
+		vmr.r = (vmr.r<<8) + (unsigned char)r[i];
 
 	return in;
 }
-std::ostream& operator<<(std::ostream &out, std::tuple<int,short,unsigned short> &vmr) {
-	char v[4];
-	char m[2];
-	char r[2];
-	for (int i = 0; i < sizeof(int); i++)
-		v[3 - i] = (std::get<0>(vmr) >> (i * 8));
-	for (int i = 0; i < sizeof(short); i++)
-		m[1 - i] = (std::get<1>(vmr) >> (i * 8));
-	for (int i = 0; i < sizeof(unsigned short); i++)
-		r[1 - i] = (std::get<2>(vmr) >> (i * 8));
-	out.write(v, sizeof(int));
-	out.write(m, sizeof(short));
-	out.write(r, sizeof(unsigned short));
+
+
+std::ostream& operator<<(std::ostream &out, memItem &vmr) {
+	size_t vsize = sizeof(vmr.v);
+	size_t msize = sizeof(vmr.m);
+	size_t rsize = sizeof(vmr.r);
+	char v[vsize];
+	char m[msize];
+	char r[rsize];
+	for (int i = 0; i < vsize; i++)
+		v[vsize - 1 - i] = (vmr.v >> (i * 8));
+	for (int i = 0; i < msize; i++)
+		m[msize - 1 - i] = (vmr.m >> (i * 8));
+	for (int i = 0; i < rsize; i++)
+		r[rsize - 1 - i] = (vmr.r >> (i * 8));
+	out.write(v, vsize);
+	out.write(m, msize);
+	out.write(r, rsize);
 	return out;
 }
 
@@ -136,36 +101,17 @@ template <>
 	};
 	size_t hash<IDj>::operator()(const IDj &x ) const
 	{
-	        size_t h = std::hash<uint64_t>()((x.t.l[0]) + (~(x.t.l[1]<<16))) ^ std::hash<uint64_t>()(~x.score[0]) ^ std::hash<uint64_t>()((int64_t)(~(x.score[1])<<4));
+	        size_t h = std::hash<uint64_t>()(x.t.l[0]) ^ std::hash<uint64_t>()((x.t.l[1]<<2) ^ ((uint64_t)x.score[0]<<50) ^ ((uint64_t)x.score[1]<<56));
 		return  h;
 	}
 }
 
 
 
-class joc {
-	public:
-		signed char board[6][2];
-		int score[2];
-		bool mou(short pos, signed char jug);
-		int ia(const signed char jug, uint8_t rec, const uint8_t path=0);
-		joc* copy();
-		short getMove();
-		void print();
-		void ini();
-		IDj getId(const signed char jug);
-		std::unordered_map<IDj, std::tuple<int, short, unsigned short> > *memoize;
-		~joc();
-		std::string id2str(const IDj &a);
-	private:
-		short moviment;
-		int getValue(const signed char jug);
-};
-
 std::string joc::id2str(const IDj &a) {
 	std::stringstream out;
-	out << "A=" << (int)a.t.c[0] << " " << (int)a.t.c[1] << " " << (int)a.t.c[2] << " " <<  (int)a.t.c[3] << " " <<  (int)a.t.c[4] << " " << (int)a.t.c[5] << " (" << a.score[0] << ")" << std::endl;
-	out << "B=" << (int)a.t.c[8] << " " << (int)a.t.c[9] << " " << (int)a.t.c[10] << " " <<  (int)a.t.c[11] << " " <<  (int)a.t.c[12] << " " << (int)a.t.c[13] << " (" << a.score[1] << ")" << std::endl;
+	out << "A=" << (int)a.t.c[0] << " " << (int)a.t.c[1] << " " << (int)a.t.c[2] << " " <<  (int)a.t.c[3] << " " <<  (int)a.t.c[4] << " " << (int)a.t.c[5] << " (" << (int)a.score[0] << ")" << std::endl;
+	out << "B=" << (int)a.t.c[8] << " " << (int)a.t.c[9] << " " << (int)a.t.c[10] << " " <<  (int)a.t.c[11] << " " <<  (int)a.t.c[12] << " " << (int)a.t.c[13] << " (" << (int)a.score[1] << ")" << std::endl;
 	return out.str();
 }
 short joc::getMove() {
@@ -249,9 +195,9 @@ int joc::ia(const signed char jug, uint8_t rec, const uint8_t path) {
 		used_memoizes++;
 		mtx2.unlock();
 #endif
-		if (std::get<2>((*memoize)[id]) >= rec) {
-			moviment = std::get<1>((*memoize)[id]);
-			auto retval = std::get<0>((*memoize)[id]);
+		if (((*memoize)[id]).r >= rec) {
+			moviment = ((*memoize)[id]).m;
+			auto retval = ((*memoize)[id]).v;
 			mtx.unlock_shared();
 			return retval;
 		}
@@ -356,8 +302,8 @@ int joc::ia(const signed char jug, uint8_t rec, const uint8_t path) {
 	if (rec >= MIN_RECURSION)  {
 		mtx.lock();
 		if ((memoize->size() < MEMOIZE_MAX_SIZE)) {
-			if ((memoize->find(id) == memoize->end()) || std::get<2>(memoize->find(id)->second) < rec) {
-				(*memoize)[id] = std::make_tuple(value, moviment, rec);
+			if ((memoize->find(id) == memoize->end()) || (memoize->find(id)->second).r < rec) {
+				(*memoize)[id] = (memItem){ .v=value, .m=moviment, .r=rec };
 			}
 		}
 		mtx.unlock();
@@ -477,7 +423,7 @@ void joc::print() {
 	std::cout << std::endl << "6 5 4 3 2 1";*/
 #endif
 	std::cout << std::endl;
-	std::cout << "Score: ME=" << score[ME] << " THEM=" << score[THEM] << std::endl;
+	std::cout << "Score: ME=" << (int)score[ME] << " THEM=" << (int)score[THEM] << std::endl;
 }
 
 void joc::ini() {
@@ -493,17 +439,17 @@ void joc::ini() {
 }
 
 
-std::unordered_map<IDj, std::tuple<int,short,unsigned short> >* load_memoize(std::string filename) {
-	std::unordered_map<IDj, std::tuple<int, short, unsigned short> > *ret = new std::unordered_map<IDj, std::tuple<int, short, unsigned short> >;
+std::unordered_map<IDj, memItem >* load_memoize(std::string filename) {
+	std::unordered_map<IDj, memItem > *ret = new std::unordered_map<IDj, memItem >;
 	IDj key;
-	std::tuple <int, short, unsigned short> valmovrec;
+	memItem valmovrec;
 	std::ifstream file;
 	file.open(filename, std::ios::in |std::ios::binary);
 	std::cout << "Loading from " << filename << "..." << std::endl;;
 	while (!file.eof() && !file.fail()) {
 		file >> key >> valmovrec;
 		// easy fast check to detect data corruption
-		if (std::get<1>(valmovrec) >= 0 && std::get<1>(valmovrec) < 6) {
+		if (valmovrec.m >= 0 && valmovrec.m < 6) {
 			(*ret)[key] = valmovrec;
 		}
 	}
@@ -541,7 +487,6 @@ int main(int argc, char**argv) {
 			case 'm':
 				memoize_file = (char*)malloc(sizeof(optarg));
 				strcpy(memoize_file, optarg);
-
 		}
 	}
 
@@ -567,13 +512,13 @@ int main(int argc, char**argv) {
 #ifdef VERBOSE_DEBUG
 	std::cout << std::endl;
 	for (auto it= t.memoize->begin(); it != t.memoize->end(); it++) {
-		std::cout << t.id2str(it->first) << "\t\t\t\t-> " << std::get<0>(it->second) << "\t" << std::get<1>(it->second) << "\t" << std::get<2>(it->second) << std::endl; 
+		std::cout << t.id2str(it->first) << "\t\t\t\t-> " << it->second.v << "\t" << it->second.m << "\t" << it->second.r << std::endl; 
 	}
 #endif
 #endif
 
 	if (primer == "") {
-		std::cout << "Qui comença? [ME/THEM] ";
+		std::cout << "Who starts? [ME/THEM] ";
 		std::cin >> primer;
 	}
 #if PRINT_MODE == MACHINE
@@ -600,7 +545,7 @@ int main(int argc, char**argv) {
 		g_clock_ticking = true;
 		t.print();
 		t.ia(ME, RECURSION_LEVEL);
-		std::cout << "Mou desde ";
+		std::cout << "Move from ";
 		std::cout << t.getMove()+1 << std::endl;
 #if PRINT_MODE == MACHINE
 		char buf[16];
@@ -646,7 +591,7 @@ int main(int argc, char**argv) {
 		myfile.open(memoize_file, std::ios::out| std::ios::binary);
 		for (auto it = t.memoize->begin(); it != t.memoize->end(); it++) {
 			IDj key;
-			std::tuple<int,short,unsigned short> valmovrec;
+			memItem valmovrec;
 			key = it->first;
 			valmovrec = it->second;
 			myfile << key << valmovrec;
@@ -692,7 +637,7 @@ int main(int argc, char**argv) {
 					fitxes_fi += t.board[i][THEM];
 				}
 				t.score[THEM] += fitxes_fi; 
-				std::cout << "Score: ME=" << t.score[ME] << " THEM=" << t.score[THEM] << std::endl;
+				std::cout << "Score: ME=" << (int)(t.score[ME]) << " THEM=" << (int)t.score[THEM] << std::endl;
 				return 0;
 			}
 

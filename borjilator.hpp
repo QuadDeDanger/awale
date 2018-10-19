@@ -15,3 +15,51 @@
 #include <getopt.h>
 
 
+typedef struct memItem {
+	// v Heuristic value
+	// m Best move
+	// r Recursion level
+	int32_t v;
+	int8_t m;
+	uint8_t r;
+} memItem;
+
+typedef union ID {
+	uint64_t l[2];
+	uint32_t i[4];
+	uint16_t s[8];
+	uint8_t c[16];
+} ID;
+
+class IDj {
+	public:
+	ID t;
+	uint8_t score[2];
+	friend bool operator==(IDj &a, IDj &b);
+	friend bool operator!=(IDj &a, IDj &b);
+	IDj() {
+		t.l[0] = 0;
+		t.l[1] = 0;
+		score[0] = 0;
+		score[1] = 0;
+	}
+};
+
+class joc {
+	public:
+		signed char board[6][2];
+		uint8_t score[2];
+		bool mou(short pos, signed char jug);
+		int ia(const signed char jug, uint8_t rec, const uint8_t path=0);
+		joc* copy();
+		short getMove();
+		void print();
+		void ini();
+		IDj getId(const signed char jug);
+		std::unordered_map<IDj, memItem > *memoize;
+		~joc();
+		std::string id2str(const IDj &a);
+	private:
+		int8_t moviment;
+		int getValue(const signed char jug);
+};
