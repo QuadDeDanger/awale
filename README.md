@@ -13,6 +13,7 @@ Some parameters are hardcoded into the `constants.h` file. You may modify them.
 
 - TIME_BUDGET_HINT: selects the amount of time the AI will play unrestricted, in milliseconds. After the configured time has past, the AI will hurry to finish.
 - TIME_BUDGET_MAX: selects the amount of time the AI will play, in milliseconds. After the configured time has past, the AI will almost instantly finish execution.
+- MEMOIZE_ENABLED: enables the use of memoizaton tables. Will also save the table in a file (default: memoization.dat) 
 - MEMOIZE_MAX_SIZE: configures the maximum amount of items to be stored in the memoization table in memory.
 
 ## Memoization table trainer
