@@ -55,22 +55,6 @@ std::ostream& operator<<(std::ostream &out, IDj &a) {
 	out << "C=" << (int)a.t.c[8] << " " << (int)a.t.c[9] << " " << (int)a.t.c[10] << " " <<  (int)a.t.c[11] << " " <<  (int)a.t.c[12] << " " << (int)a.t.c[13] << " " << std::endl;
 	return out;
 }*/
-std::istream& operator>>(std::istream &in, std::tuple<int,short,unsigned short> &vmr) {
-	char v[4];
-	char m[2];
-	char r[2];
-	in.read(v, vsize);
-	in.read(m, msize);
-	in.read(r, rsize);
-	for (int i = 0; i < vsize; i++)
-		vmr.v = (vmr.v<<8) + (unsigned char)v[i];
-	for (int i = 0; i < msize; i++)
-		vmr.m = (vmr.m<<8) + (unsigned char)m[i];
-	for (int i = 0; i < rsize; i++)
-		vmr.r = (vmr.r<<8) + (unsigned char)r[i];
-
-	return in;
-}
 
 
 std::ostream& operator<<(std::ostream &out, memItem &vmr) {
@@ -91,6 +75,27 @@ std::ostream& operator<<(std::ostream &out, memItem &vmr) {
 	out.write(r, rsize);
 	return out;
 }
+
+std::istream& operator>>(std::istream &in, memItem &vmr) {
+	char v[4];
+	char m[2];
+	char r[2];
+	size_t vsize = sizeof(vmr.v);
+	size_t msize = sizeof(vmr.m);
+	size_t rsize = sizeof(vmr.r);
+	in.read(v, vsize);
+	in.read(m, msize);
+	in.read(r, rsize);
+	for (int i = 0; i < vsize; i++)
+		vmr.v = (vmr.v<<8) + (unsigned char)v[i];
+	for (int i = 0; i < msize; i++)
+		vmr.m = (vmr.m<<8) + (unsigned char)m[i];
+	for (int i = 0; i < rsize; i++)
+		vmr.r = (vmr.r<<8) + (unsigned char)r[i];
+
+	return in;
+}
+
 
 // Hash function to enable use of IDj as a map index for the memoization table
 namespace std {
