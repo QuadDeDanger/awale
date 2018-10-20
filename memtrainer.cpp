@@ -33,8 +33,7 @@ std::istream& operator>>(std::istream &in, IDj &a) {
 std::ostream& operator<<(std::ostream &out, IDj &a) {
 	out.write((char*)a.t.c, 6*sizeof(uint8_t));
 	out.write((char*)&a.t.c[8], 6*sizeof(uint8_t));
-	out.write((char*)&a.score[0], sizeof(uint8_t));
-	out.write((char*)&a.score[1], sizeof(uint8_t));
+	out.write((char*)a.score, 2*sizeof(uint8_t));
 	return out;
 }
 /*std::ostream& operator<<(std::ostream &out, const IDj &a) {
@@ -171,9 +170,14 @@ bool joc::mou(short pos, signed char jug) {
 	return !(fitxes_rival == 0 && cangive);
 }
 
-int joc::ia(const signed char jug, uint8_t rec, const uint8_t path) {
+// Returns the heuristic value for the board, recursion modifier
+// First parameter: player
+// Second parameter: recursion level
+// Third parameter: initial path (for speculative exploration)
+std::pair<int, uint8_t> joc::ia(const signed char jug, uint8_t rec, const uint8_t path) {
 	int value = INT_MIN;
 	long long int anti_val, valor_actual;
+	uint8_t anti_rec_mod, rec_mod = 0;
 	short pos;
 	
 	IDj id = getId(jug);
@@ -189,14 +193,14 @@ int joc::ia(const signed char jug, uint8_t rec, const uint8_t path) {
 			moviment = ((*memoize)[id]).m;
 			auto retval = ((*memoize)[id]).v;
 			mtx.unlock_shared();
-			return retval;
+			return std::make_pair(retval, 0);
 		}
 	}
 	mtx.unlock_shared();
 
 	valor_actual = getValue(jug);
 	if (rec <= 0) {
-		return valor_actual;
+		return std::make_pair(valor_actual, 0);
 	}
 
 	if (valor_actual < PODA && rec < RECURSION_LEVEL) {
@@ -204,9 +208,9 @@ int joc::ia(const signed char jug, uint8_t rec, const uint8_t path) {
 		std::cout << "Poda realitzada" << std::endl;
 #endif
 		if (valor_actual - PODA_PENALTY < INT_MIN)
-			return INT_MIN;
+			return std::make_pair(INT_MIN, 0);
 		else
-			return valor_actual - PODA_PENALTY;
+			return std::make_pair(valor_actual - PODA_PENALTY,0);
 	}
 
 	for (pos=0; pos < 6; pos++) {
@@ -216,12 +220,15 @@ int joc::ia(const signed char jug, uint8_t rec, const uint8_t path) {
 				delete c;
 				continue;
 			}
-			anti_val = c->ia((jug+1)%2, rec-1, path);
+			auto res = c->ia((jug+1)%2, rec-1, path);
+			anti_val = res.first;
+			anti_rec_mod = res.second;
 			int valor_actual_tmp = (valor_actual-anti_val>INT_MIN)? valor_actual-anti_val: INT_MIN;
 			valor_actual = (valor_actual-anti_val<INT_MAX)? valor_actual_tmp: INT_MAX;
 			if (valor_actual > value || moviment == -1) {
 				moviment = pos;
 				value = valor_actual;
+				rec_mod += anti_rec_mod;
 			}
 			delete c;
 		}
@@ -277,11 +284,11 @@ int joc::ia(const signed char jug, uint8_t rec, const uint8_t path) {
 	}
 
 	assert(memoize);
-	if (rec >= MIN_RECURSION)  {
+	if (rec-rec_mod >= MIN_RECURSION)  {
 		mtx.lock();
 		if ((memoize->size() < MEMOIZE_MAX_SIZE)) {
 			if ((memoize->find(id) == memoize->end()) || (memoize->find(id)->second).r < rec) {
-				memItem valmovrec = (memItem){ .v=value, .m=moviment, .r=rec };
+				memItem valmovrec = (memItem){ .v=value, .m=moviment, .r=rec-rec_mod };
 				(*memoize)[id] = valmovrec;
 
 				std::cout << id2str(id) << "\t\tsize=" << memoize->size() << "\t\t-> "<< "\t" << (int)valmovrec.m << "\t" << (int)valmovrec.r << "\t(" << valmovrec.v << ")"  << std::endl << std::endl; 
@@ -305,7 +312,7 @@ int joc::ia(const signed char jug, uint8_t rec, const uint8_t path) {
 		mtx.unlock();
 	}
 
-	return value;
+	return std::make_pair(value, rec_mod);
 }
 
 joc* joc::copy() {

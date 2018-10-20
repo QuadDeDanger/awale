@@ -1,5 +1,10 @@
 #include "borjilator.hpp"
 
+
+#ifndef PRINT_MODE
+#error Please define PRINT_MODE to HUMAN or MACHINE in your Makefile
+#endif
+
 #if PRINT_MODE == MACHINE
 #include <fcntl.h>
 #include <sys/types.h>
@@ -119,7 +124,7 @@ std::string joc::id2str(const IDj &a) {
 	out << "B=" << (int)a.t.c[8] << " " << (int)a.t.c[9] << " " << (int)a.t.c[10] << " " <<  (int)a.t.c[11] << " " <<  (int)a.t.c[12] << " " << (int)a.t.c[13] << " (" << (int)a.score[1] << ")" << std::endl;
 	return out.str();
 }
-short joc::getMove() {
+int8_t joc::getMove() {
 	return moviment;
 }
 
@@ -138,12 +143,12 @@ IDj joc::getId(const signed char jug) {
 
 bool joc::mou(short pos, signed char jug) {
 	bool cangive = false;
-	short fitxes = board[pos][jug];
+	short fitxes; 
 	short fitxes_rival = 0;
 	const signed char jug_ini = jug;
 	const short pos_ini = pos;
 
-	if (pos >= 6 || pos < 0 || fitxes <= 0) {
+	if (pos >= 6 || pos < 0 || board[pos][jug] <= 0) {
 		return false;
 	}
 
@@ -151,6 +156,7 @@ bool joc::mou(short pos, signed char jug) {
 		cangive = cangive || board[i][jug] > i;
 	}
 
+	fitxes = board[pos][jug];
 	board[pos][jug] = 0;
 	
 	while (fitxes > 0) {
@@ -560,8 +566,7 @@ int main(int argc, char**argv) {
 		g_clock_ticking = true;
 		t.print();
 		t.ia(ME, RECURSION_LEVEL);
-		std::cout << "Move from ";
-		std::cout << t.getMove()+1 << std::endl;
+		std::cout << "Move from " << t.getMove()+1 << std::endl;
 #if PRINT_MODE == MACHINE
 		char buf[16];
 		snprintf(buf, sizeof(buf), "%d", t.getMove()+1);

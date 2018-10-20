@@ -8,10 +8,6 @@
 
 #define BOARD_MODE THEM 
 
-#ifndef PRINT_MODE
-#error Please define PRINT_MODE to HUMAN or MACHINE in your Makefile
-#endif
-
 // MIN_RECURSION: minimum number of recursions before we allow killing the thread
 // also servers as a threshold for the memoization table
 #define MIN_RECURSION 8

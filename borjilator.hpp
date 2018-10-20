@@ -50,9 +50,9 @@ class joc {
 		signed char board[6][2];
 		uint8_t score[2];
 		bool mou(short pos, signed char jug);
-		int ia(const signed char jug, uint8_t rec, const uint8_t path=0);
+		std::pair<int, uint8_t> ia(const signed char jug, uint8_t rec, const uint8_t path=0);
 		joc* copy();
-		short getMove();
+		int8_t getMove();
 		void print();
 		void ini();
 		IDj getId(const signed char jug);
