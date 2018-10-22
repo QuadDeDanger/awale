@@ -195,7 +195,7 @@ bool joc::mou(short pos, signed char jug) {
 // First parameter: player
 // Second parameter: recursion level
 // Third parameter: initial path (for speculative exploration)
-std::pair<int, uint8_t> joc::ia(const signed char jug, uint8_t rec, const uint8_t path) {
+std::pair<int, uint8_t> joc::ia(const signed char jug, const uint8_t rec, const uint8_t path) {
 	int value = INT_MIN;
 	long long int anti_val, valor_actual;
 	uint8_t anti_rec_mod, rec_mod = 0;
@@ -241,10 +241,8 @@ std::pair<int, uint8_t> joc::ia(const signed char jug, uint8_t rec, const uint8_
 
 	auto time = clock();
 	if (g_clock_ticking && rec > MIN_RECURSION && (time-g_start_time)*1000/CLOCKS_PER_SEC > TIME_BUDGET_HINT) {
-		rec--;
 		rec_mod++;
 	} else if (g_clock_ticking && rec > 1 && (time-g_start_time)*1000/CLOCKS_PER_SEC > TIME_BUDGET_MAX) {
-		rec--;
 		rec_mod++;
 	}
 
@@ -255,19 +253,19 @@ std::pair<int, uint8_t> joc::ia(const signed char jug, uint8_t rec, const uint8_
 				delete c;
 				continue;
 			}
-			auto res = c->ia((jug+1)%2, rec-1, path);
+			auto res = c->ia((jug+1)%2, rec-rec_mod-1, path);
 			anti_val = res.first;
-			anti_rec_mod = res.second;
+			anti_rec_mod = MAX(anti_rec_mod, res.second);
 			int valor_actual_tmp = (valor_actual-anti_val>INT_MIN)? valor_actual-anti_val: INT_MIN;
 			valor_actual = (valor_actual-anti_val<INT_MAX)? valor_actual_tmp: INT_MAX;
 			if (valor_actual > value || moviment == -1) {
 				moviment = pos;
 				value = valor_actual;
-				rec_mod += anti_rec_mod;
 			}
 			delete c;
 		}
 	}
+	rec_mod += anti_rec_mod;
 	
 #ifdef VERBOSE_DEBUG
 	if (rec > 0) {
@@ -314,7 +312,7 @@ std::pair<int, uint8_t> joc::ia(const signed char jug, uint8_t rec, const uint8_
 		}
 		else {
 			// If we can't move, the opponent gets every remaining piece on the board. 
-			value=value-(MORTES_MULT)*(48-score[ME]-score[THEM]);
+			value=MIN(value-(MORTES_MULT)*(48-score[ME]-score[THEM]), INT_MIN);
 		}
 	}
 
@@ -323,8 +321,8 @@ std::pair<int, uint8_t> joc::ia(const signed char jug, uint8_t rec, const uint8_
 	if (rec-rec_mod >= MIN_RECURSION)  {
 		mtx.lock();
 		if ((memoize->size() < MEMOIZE_MAX_SIZE)) {
-			if ((memoize->find(id) == memoize->end()) || (memoize->find(id)->second).r < rec) {
-				(*memoize)[id] = (memItem){ .v=value, .m=moviment, .r=rec };
+			if ((memoize->find(id) == memoize->end()) || (memoize->find(id)->second).r < (rec-rec_mod)) {
+				(*memoize)[id] = (memItem){ .v=value, .m=moviment, .r=(int8_t)(rec-rec_mod) };
 			}
 		}
 		mtx.unlock();
@@ -425,18 +423,22 @@ void joc::print() {
 #if BOARD_MODE == ME
 /*	std::cout << "1 2 3 4 5 6" << std::endl;
 	std::cout << "-----------" << std::endl;*/
+	std::cout << "THEM:\t";
 	for (i=0; i<6; i++) {
 		std::cout << (signed)board[i][THEM] <<" ";
 	}
 	std::cout << std::endl;
+	std::cout << "  ME:\t";
 	for (i=5; i>=0; i--) {
 		std::cout << (signed)board[i][ME] <<" ";
 	}
 #else
+	std::cout << "  ME:\t";
 	for (i=0; i<6; i++) {
 		std::cout << (signed)board[i][ME] <<" ";
 	}
 	std::cout << std::endl;
+	std::cout << "THEM:\t";
 	for (i=5; i>=0; i--) {
 		std::cout << (signed)board[i][THEM] <<" ";
 	}

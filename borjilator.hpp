@@ -21,7 +21,7 @@ typedef struct memItem {
 	// r Recursion level
 	int32_t v;
 	int8_t m;
-	uint8_t r;
+	int8_t r;
 } memItem;
 
 typedef union ID {

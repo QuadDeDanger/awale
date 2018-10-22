@@ -104,7 +104,7 @@ std::string joc::id2str(const IDj &a) {
 	out << "B=" << (int)a.t.c[8] << " " << (int)a.t.c[9] << " " << (int)a.t.c[10] << " " <<  (int)a.t.c[11] << " " <<  (int)a.t.c[12] << " " << (int)a.t.c[13] << " (" << (int)a.score[1] << ")" << std::endl;
 	return out.str();
 }
-short joc::getMove() {
+int8_t joc::getMove() {
 	return moviment;
 }
 
@@ -287,7 +287,7 @@ std::pair<int, uint8_t> joc::ia(const signed char jug, uint8_t rec, const uint8_
 	if (rec-rec_mod >= MIN_RECURSION)  {
 		mtx.lock();
 		if ((memoize->size() < MEMOIZE_MAX_SIZE)) {
-			if ((memoize->find(id) == memoize->end()) || (memoize->find(id)->second).r < rec) {
+			if ((memoize->find(id) == memoize->end()) || (memoize->find(id)->second).r < (rec-rec_mod)) {
 				memItem valmovrec = (memItem){ .v=value, .m=moviment, .r=rec-rec_mod };
 				(*memoize)[id] = valmovrec;
 
@@ -503,14 +503,6 @@ int main(int argc, char**argv) {
 	t.ini();
 	t.memoize = load_memoize(memoize_file);
 	std::cout << std::endl;
-	for (auto it= t.memoize->begin(); it != t.memoize->end(); it++) {
-		std::cout << t.id2str(it->first) << "\t\t\t\t-> " << it->second.v << "\t" << it->second.m << "\t" << it->second.r << std::endl; 
-		// Simple check to ensure integrity
-		if (it->second.m > 5 || it->second.m < 0) {
-			t.memoize->erase(it->first);
-		}
-	}
-	std::cout << "Loaded " << t.memoize->size() << " items from file." << std::endl;
 
 	// multithread while waiting for rival 
 	for (int i=0; i<6; i++) {
