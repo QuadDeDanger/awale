@@ -82,9 +82,6 @@ std::ostream& operator<<(std::ostream &out, memItem &vmr) {
 }
 
 std::istream& operator>>(std::istream &in, memItem &vmr) {
-	char v[4];
-	char m[2];
-	char r[2];
 	size_t vsize = sizeof(vmr.v);
 	size_t msize = sizeof(vmr.m);
 	size_t rsize = sizeof(vmr.r);
@@ -198,7 +195,7 @@ bool joc::mou(short pos, signed char jug) {
 std::pair<int, uint8_t> joc::ia(const signed char jug, const uint8_t rec, const uint8_t path) {
 	int value = INT_MIN;
 	long long int anti_val, valor_actual;
-	uint8_t anti_rec_mod, rec_mod = 0;
+	uint8_t anti_rec_mod = 0, rec_mod = 0;
 	short pos;
 	
 	IDj id = getId(jug);
@@ -236,7 +233,7 @@ std::pair<int, uint8_t> joc::ia(const signed char jug, const uint8_t rec, const 
 		if (valor_actual - PODA_PENALTY < INT_MIN)
 			return std::make_pair(INT_MIN, 0);
 		else
-			return std::make_pair(valor_actual - PODA_PENALTY,0);
+			return std::make_pair(valor_actual - PODA_PENALTY, 0);
 	}
 
 	auto time = clock();
@@ -269,7 +266,7 @@ std::pair<int, uint8_t> joc::ia(const signed char jug, const uint8_t rec, const 
 	
 #ifdef VERBOSE_DEBUG
 	if (rec > 0) {
-		std::cout << "rec=" << rec << std::endl;
+		std::cout << "rec=" << (int)rec << std::endl;
 		print();
 		for(int i=RECURSION_LEVEL-rec; i>0; i--) {
 			std::cout << " ";

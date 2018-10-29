@@ -288,10 +288,10 @@ std::pair<int, uint8_t> joc::ia(const signed char jug, uint8_t rec, const uint8_
 		mtx.lock();
 		if ((memoize->size() < MEMOIZE_MAX_SIZE)) {
 			if ((memoize->find(id) == memoize->end()) || (memoize->find(id)->second).r < (rec-rec_mod)) {
-				memItem valmovrec = (memItem){ .v=value, .m=moviment, .r=rec-rec_mod };
+				memItem valmovrec = (memItem){ .v=value, .m=moviment, .r=(int8_t)(rec-rec_mod) };
 				(*memoize)[id] = valmovrec;
 
-				std::cout << id2str(id) << "\t\tsize=" << memoize->size() << "\t\t-> "<< "\t" << (int)valmovrec.m << "\t" << (int)valmovrec.r << "\t(" << valmovrec.v << ")"  << std::endl << std::endl; 
+				std::cout << id2str(id) << "\t\tsize=" << memoize->size() << "\t\t-> "<< "\t" << (int)valmovrec.m << "\t" << (int)valmovrec.r << "\t(" << value << ")"  << std::endl << std::endl; 
 				if (rand()%200 == 0) {
 					std::cout << "Saving to memoize.dat... " ;
 					// save to a file
